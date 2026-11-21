@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Paper Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: control bar, ticker strip, portfolio + stats, council stage with pitch cards, chart, trust scores, feed. Dark terminal look, gold / teal / red signals. */
+:root{
+  --bg:#060a0f; --bg2:#0a1017; --panel:#0c131b; --line:#18232e; --line2:#223140;
+  --fg:#d4dde6; --mute:#6f8091; --dim:#3c4a58;
+  --gold:#f5a524; --teal:#2fd6c0; --up:#39e58c; --down:#ff5d5d; --violet:#a78bfa; --blue:#6aa9ff;
+  --mono:'IBM Plex Mono',ui-monospace,'Cascadia Mono',Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:radial-gradient(1200px 500px at 70% -10%,#0f1b27 0,transparent 60%),var(--bg);color:var(--fg);font:12.5px/1.5 var(--mono);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));min-height:100vh}
+.wrap{max-width:1240px;margin:0 auto;padding-bottom:40px}
+button{font:inherit;color:inherit}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.lab{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+.up{color:var(--up)} .down{color:var(--down)} .gold{color:var(--gold)}
+
+/* top bar */
+.top{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--line)}
+.brand{display:flex;gap:12px;align-items:center}
+.logo{width:26px;height:26px;border:1.5px solid var(--teal);transform:rotate(45deg);display:grid;place-items:center;margin:0 4px}
+.logo i{width:8px;height:8px;background:var(--teal);display:block}
+.brand h1{margin:0;font-size:14px;letter-spacing:.2em;font-weight:700;text-transform:uppercase}
+.pill{display:inline-flex;gap:8px;align-items:center;border:1px solid var(--line2);padding:4px 10px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;background:var(--bg2)}
+.pill b{width:8px;height:8px;display:inline-block;background:var(--teal)}
+.pill.live b{background:var(--up);box-shadow:0 0 8px var(--up)}
+.pill.err b{background:var(--down)}
+.ctrls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.seg{display:flex;border:1px solid var(--line2)}
+.seg button{background:var(--bg2);border:0;border-right:1px solid var(--line2);padding:6px 11px;cursor:pointer;font-size:11px;letter-spacing:.06em;color:var(--mute)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed=true]{background:var(--gold);color:#101010;font-weight:700}
+.btn{background:var(--bg2);border:1px solid var(--line2);padding:6px 12px;cursor:pointer;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.btn:hover{border-color:var(--mute)}
+.btn.go{background:var(--up);color:#06150c;border-color:var(--up);font-weight:700}
+.fld{display:flex;gap:6px;align-items:center;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--mute)}
+.fld input,.fld select{background:var(--bg2);border:1px solid var(--line2);color:var(--fg);padding:5px 8px;font:inherit;font-size:12px;text-transform:none;letter-spacing:0}
+.fld input{width:84px}
+
+/* ticker */
+.strip{display:flex;overflow-x:auto;border-bottom:1px solid var(--line);scrollbar-width:thin}
+.tk{flex:1 0 auto;min-width:150px;background:none;border:0;border-right:1px solid var(--line);padding:9px 14px;text-align:left;cursor:pointer;display:grid;gap:1px}
+.tk[aria-pressed=true]{background:#0f1923;box-shadow:inset 0 -2px var(--gold)}
+.tk .n{font-weight:600;font-size:11px;letter-spacing:.06em}
+.tk .p{font-size:13px;font-variant-numeric:tabular-nums}
+.tk .c{font-size:11px;font-variant-numeric:tabular-nums}
+
+/* sections */
+.sec{margin-top:22px}
+.sec>.hd{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:10px}
+.sec>.hd h2{margin:0;font-size:11px;letter-spacing:.18em;text-transform:uppercase;font-weight:600}
+.sec>.hd span{color:var(--mute);font-size:11px}
+.box{background:var(--panel);border:1px solid var(--line);min-width:0}
+
+/* portfolio */
+.pfrow{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px}
+@media (max-width:900px){.pfrow{grid-template-columns:1fr}}
+.pf{padding:16px 18px}
+.pfv{font-size:44px;font-weight:700;line-height:1.05;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.pfs{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:6px;color:var(--mute);font-size:11px}
+canvas{width:100%;display:block}
+#eqc{height:150px;margin-top:10px}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line)}
+.st{background:var(--panel);padding:14px 16px;display:grid;gap:3px;align-content:start}
+.st .v{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+.st .s{font-size:10.5px;color:var(--mute)}
+
+/* council */
+.stage{padding:18px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:900px){.stage{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.ag{display:grid;gap:8px;justify-items:center;text-align:center;min-width:0}
+.av{width:68px;height:68px;position:relative}
+.av svg{width:100%;height:100%;display:block}
+.av .halo{position:absolute;inset:-6px;border-radius:50%;opacity:0;transition:opacity .25s}
+.ag.talk .av .halo{opacity:1}
+.ag .nm{font-weight:700;letter-spacing:.12em;font-size:12px;text-transform:uppercase}
+.ag .rl{font-size:10.5px;color:var(--mute)}
+.say{font-size:11px;color:var(--fg);background:var(--bg2);border:1px solid var(--line2);padding:7px 9px;width:100%;min-height:58px;text-align:left;position:relative}
+.say:before{content:"";position:absolute;top:-5px;left:50%;width:8px;height:8px;background:var(--bg2);border-left:1px solid var(--line2);border-top:1px solid var(--line2);transform:translateX(-50%) rotate(45deg)}
+.pitches{border-top:1px solid var(--line)}
+.pc{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1.5fr) auto;gap:6px 18px;padding:12px 18px;border-bottom:1px solid var(--line);align-items:start}
+.pc:last-child{border-bottom:0}
+@media (max-width:760px){.pc{grid-template-columns:1fr}}
+.pc .who{font-size:10.5px;color:var(--mute)}
+.pc .sym{font-weight:700;font-size:14px}
+.pc .plan{font-size:11px;color:var(--mute);margin-top:2px}
+.chk{list-style:none;margin:0;padding:0;font-size:11px}
+.chk li{padding-left:16px;position:relative;color:var(--mute)}
+.chk li:before{content:"×";position:absolute;left:0;color:var(--down)}
+.chk li.ok{color:var(--fg)} .chk li.ok:before{content:"✓";color:var(--up)}
+.bar{height:4px;background:var(--line2);margin-top:6px;width:100%}
+.bar i{display:block;height:100%}
+.vd{font-weight:700;font-size:11px;letter-spacing:.1em;padding:4px 10px;border:1px solid currentColor;text-align:center;white-space:nowrap}
+.vd.take{color:var(--up)} .vd.pass{color:var(--down)} .vd.fence{color:var(--gold)}
+.rule{font-size:10.5px;margin-top:4px;text-align:center;color:var(--mute);white-space:nowrap}
+.empty{padding:18px;color:var(--mute);font-size:11.5px}
+
+/* chart + positions */
+.two{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:16px}
+@media (max-width:900px){.two{grid-template-columns:1fr}}
+.two>div{min-width:0}
+.chb{padding:14px 16px}
+#pc{height:300px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;color:var(--mute);font-size:10.5px;margin-top:6px}
+.legend i{display:inline-block;width:12px;height:2px;margin-right:5px;vertical-align:middle}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:8px 12px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap;font-size:11.5px}
+th:first-child,td:first-child{text-align:left}
+th{font-weight:500;color:var(--mute);font-size:10px;letter-spacing:.1em;text-transform:uppercase}
+tr:last-child td{border-bottom:0}
+
+/* trust + feed */
+.trust td.sp{padding:4px 12px}
+.meter{display:inline-grid;grid-auto-flow:column;gap:2px;vertical-align:middle}
+.meter i{width:4px;height:12px;background:var(--line2)}
+.feed{max-height:340px;overflow:auto}
+.fi{padding:9px 14px;border-bottom:1px solid var(--line);font-size:11.5px;display:grid;grid-template-columns:auto 1fr;gap:2px 10px}
+.fi:last-child{border-bottom:0}
+.fi .w{font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:10.5px}
+.fi .t{color:var(--mute);font-size:10px}
+footer{margin-top:28px;padding-top:14px;border-top:1px solid var(--line);color:var(--mute);font-size:10.5px;max-width:860px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="top">
+  <div class="brand">
+    <div class="logo"><i></i></div>
+    <div><h1>Paper Desk</h1><div class="lab">Four agents. Virtual money.</div></div>
+    <span class="pill" id="mode"><b></b><span id="modeTxt">loading</span></span>
+  </div>
+  <div class="ctrls">
+    <div class="seg" role="group" aria-label="Market"><button id="m-cr" aria-pressed="true">Crypto</button><button id="m-fx" aria-pressed="false">Forex</button></div>
+    <button class="btn" id="pause">Pause</button>
+    <div class="seg" role="group" aria-label="Speed"><button data-sp="1" aria-pressed="false">1x</button><button data-sp="6" aria-pressed="true">6x</button><button data-sp="30" aria-pressed="false">30x</button><button data-sp="400" aria-pressed="false">Max</button></div>
+    <label class="fld">Virtual cash (£)<input id="cash" type="number" min="50" step="50" value="1000"></label>
+    <label class="fld">Start from<select id="from"></select></label>
+    <button class="btn go" id="restart">Restart</button>
+  </div>
+</div>
+
+<div class="strip" id="strip" aria-label="Markets"></div>
+
+<div class="sec">
+  <div class="hd"><h2>Portfolio</h2><span id="pfnote"></span></div>
+  <div class="pfrow">
+    <div class="box pf">
+      <div class="lab">Virtual portfolio · run by the council</div>
+      <div class="pfv" id="eq">—</div>
+      <div class="pfs" id="pfs"></div>
+      <canvas id="eqc" aria-label="Portfolio value over time"></canvas>
+      <div class="legend"><span><i style="background:var(--down)"></i><span id="eqleg">Council</span></span><span><i style="background:var(--mute)"></i>Just holding everything equally</span></div>
+    </div>
+    <div class="stats">
+      <div class="st"><span class="lab">Today</span><span class="v" id="s-today">—</span><span class="s" id="s-today2"></span></div>
+      <div class="st"><span class="lab">Win rate</span><span class="v" id="s-win">—</span><span class="s" id="s-win2"></span></div>
+      <div class="st"><span class="lab">Average trade</span><span class="v" id="s-r">—</span><span class="s">profit as a multiple of the risk</span></div>
+      <div class="st"><span class="lab">Profit factor</span><span class="v" id="s-pf">—</span><span class="s">won per £1 lost</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="sec">
+  <div class="hd"><h2>The council</h2><span>Aadi and Beena pitch. Chandu weighs each idea. Mani rules.</span></div>
+  <div class="box">
+    <div class="stage" id="stage"></div>
+    <div class="pitches" id="pitches"></div>
+  </div>
+</div>
+
+<div class="sec two">
+  <div>
+    <div class="hd" style="display:flex;justify-content:space-between;margin-bottom:10px"><h2 style="margin:0;font-size:11px;letter-spacing:.18em;text-transform:uppercase">Chart <span id="ctitle" style="color:var(--mute);letter-spacing:0;text-transform:none;font-weight:400"></span></h2></div>
+    <div class="box chb">
+      <canvas id="pc" aria-label="Price chart"></canvas>
+      <div class="legend"><span><i style="background:var(--gold)"></i><span id="vwl">VWAP</span></span><span style="color:var(--up)">▲ bought</span><span style="color:var(--down)">▼ sold</span><span id="stpLeg"></span></div>
+    </div>
+  </div>
+  <div>
+    <div class="hd" style="display:flex;justify-content:space-between;margin-bottom:10px"><h2 style="margin:0;font-size:11px;letter-spacing:.18em;text-transform:uppercase">Open positions</h2></div>
+    <div class="box tbl" id="pos"></div>
+  </div>
+</div>
+
+<div class="sec two">
+  <div>
+    <div class="hd" style="display:flex;justify-content:space-between;margin-bottom:10px"><h2 style="margin:0;font-size:11px;letter-spacing:.18em;text-transform:uppercase">Trust scores</h2><span style="color:var(--mute);font-size:11px">Everyone starts at 50. A win moves it up, a loss moves it down.</span></div>
+    <div class="box tbl trust" id="trust"></div>
+    <div class="hd" style="display:flex;justify-content:space-between;margin:22px 0 10px"><h2 style="margin:0;font-size:11px;letter-spacing:.18em;text-transform:uppercase">Closed trades</h2></div>
+    <div class="box tbl" id="closed"></div>
+  </div>
+  <div>
+    <div class="hd" style="display:flex;justify-content:space-between;margin-bottom:10px"><h2 style="margin:0;font-size:11px;letter-spacing:.18em;text-transform:uppercase">What they have learned</h2></div>
+    <div class="box feed" id="feed"></div>
+  </div>
+</div>
+
+<footer>
+  This is a simulation for learning. It trades virtual money on real past prices, then keeps going on live prices once the replay catches up.
+  Crypto prices: Binance public data, 5-minute bars. Forex: ECB daily reference rates via Frankfurter, quoted as the value of the currency in pounds.
+  Nothing here is financial advice. Past patterns do not predict future prices.
+</footer>
+</div>
+
+<script>
+'use strict';
+/* ================= config ================= */
+const $ = id => document.getElementById(id);
+const MK = {
+  cr:{ name:'Crypto', warm:40, dayBars:288, maxPos:3, maxHold:72, cool:12,
+       list:[['BTCGBP','BTC / GBP'],['ETHGBP','ETH / GBP'],['SOLGBP','SOL / GBP'],['XRPGBP','XRP / GBP']],
+       from:[['Last 3 days',860],['Last 2 days',570],['Last day',285]], barName:'5-minute bars', unit:'bar' },
+  fx:{ name:'Forex', warm:35, dayBars:1, maxPos:3, maxHold:15, cool:3,
+       list:[['USD','USD / GBP'],['EUR','EUR / GBP'],['INR','100 INR / GBP'],['JPY','100 JPY / GBP'],['AUD','AUD / GBP'],['CAD','CAD / GBP']],
+       from:[['Last 6 months',150],['Last 4 months',100],['Last 2 months',50]], barName:'daily closes', unit:'day' }
+};
+const AG = {
+  aadi:  {name:'Aadi',   role:'Always eager to invest', col:'#f5a524', g:['#ffcf70','#b8680b'], tag:'A'},
+  beena: {name:'Beena',  role:'Takes calculated risk',  col:'#2fd6c0', g:['#7ff0e0','#0b7d70'], tag:'B'},
+  chandu:{name:'Chandu', role:'The trading consultant', col:'#a78bfa', g:['#cdbdff','#5a3fc0'], tag:'C'},
+  mani:  {name:'Mani',   role:'The deciding judge',     col:'#ff7a59', g:['#ffb199','#b8381a'], tag:'M'}
+};
+const KEYS = Object.keys(AG);
+
+/* ================= state ================= */
+let market='cr', sel=null, speed=6, paused=false, acc=0, lastT=0, dirty=true;
+let D={}, N=0, cur=0, mode='loading', err=false, liveTimer=null, fromBars=860;
+let S=null;
+
+function fresh(cash,startIdx){
+  return { cash, start:cash, startIdx, pos:{}, closed:[], marks:{}, cool:{},
+    trust:{aadi:50,beena:50,chandu:50,mani:50}, hist:{aadi:[50],beena:[50],chandu:[50],mani:[50]},
+    minConf:{aadi:35,beena:35}, stats:{aadi:{p:0,w:0},beena:{p:0,w:0},chandu:{p:0,w:0},mani:{p:0,w:0}},
+    feed:[], pitches:[], say:{}, eq:[], bench:[], px0:{} };
+}
+
+/* ================= data ================= */
+async function loadMarket(){
+  err=false; mode='loading'; D={}; render();
+  try{
+    if(market==='cr'){
+      const now=Date.now();
+      const res=await Promise.all(MK.cr.list.map(async([id])=>{
+        const r=await fetch(`https://data-api.binance.vision/api/v3/klines?symbol=${id}&interval=5m&limit=1000`);
+        if(!r.ok) throw new Error(id+' '+r.status); return [id,(await r.json()).filter(k=>k[6]<now).map(k=>({t:k[0],o:+k[1],h:+k[2],l:+k[3],c:+k[4],v:+k[5]}))];
+      }));
+      N=Math.min(...res.map(x=>x[1].length)); res.forEach(([id,a])=>D[id]=a.slice(a.length-N));
+    } else {
+      const end=new Date(), st=new Date(Date.now()-240*864e5), iso=d=>d.toISOString().slice(0,10);
+      const syms=MK.fx.list.map(x=>x[0]).join(',');
+      const r=await fetch(`https://api.frankfurter.dev/v1/${iso(st)}..${iso(end)}?base=GBP&symbols=${syms}`);
+      if(!r.ok) throw new Error('forex '+r.status);
+      const j=await r.json(), days=Object.keys(j.rates).sort().filter(d=>MK.fx.list.every(([id])=>j.rates[d][id]));
+      MK.fx.list.forEach(([id])=>{ const sc=(id==='INR'||id==='JPY')?100:1;
+        D[id]=days.map(d=>{const p=sc/j.rates[d][id]; return {t:new Date(d+'T16:00:00Z').getTime(),o:p,h:p,l:p,c:p,v:null};}); });
+      N=days.length;
+    }
+  }catch(e){ console.warn(e); err=true; mode='error'; render(); return; }
+  if(!sel||!D[sel]) sel=MK[market].list[0][0];
+  restart();
+}
+async function pollLive(){
+  if(market!=='cr'||mode!=='live') return;
+  try{
+    const now=Date.now(); let added=null;
+    const res=await Promise.all(MK.cr.list.map(async([id])=>{
+      const r=await fetch(`https://data-api.binance.vision/api/v3/klines?symbol=${id}&interval=5m&limit=12`);
+      if(!r.ok) throw new Error('live '+r.status);
+      const k=(await r.json()).filter(x=>x[6]<now&&x[0]>D[id][D[id].length-1].t).map(x=>({t:x[0],o:+x[1],h:+x[2],l:+x[3],c:+x[4],v:+x[5]}));
+      return [id,k];
+    }));
+    const n=Math.min(...res.map(x=>x[1].length));
+    if(n>0){ res.forEach(([id,k])=>D[id].push(...k.slice(0,n))); N+=n; err=false; }
+    else err=false;
+  }catch(e){ err=true; }
+  dirty=true;
+}
+
+/* ================= indicators ================= */
+const C = id => D[id];
+function sma(id,i,n){ if(i<n-1) return null; let s=0; const a=D[id]; for(let k=i-n+1;k<=i;k++) s+=a[k].c; return s/n; }
+function rsi(id,i,n=14){ if(i<n) return 50; let g=0,l=0; const a=D[id]; for(let k=i-n+1;k<=i;k++){const d=a[k].c-a[k-1].c; if(d>0) g+=d; else l-=d;} return l===0?100:100-100/(1+g/l); }
+function rstd(id,i,n){ const a=D[id]; const r=[]; for(let k=Math.max(1,i-n+1);k<=i;k++) r.push(a[k].c/a[k-1].c-1); const m=r.reduce((x,y)=>x+y,0)/r.length; return Math.sqrt(r.reduce((x,y)=>x+(y-m)*(y-m),0)/r.length)||1e-6; }
+function atrp(id,i,n=14){ const a=D[id]; let s=0,c=0; for(let k=Math.max(1,i-n+1);k<=i;k++){ const rg=Math.max(a[k].h-a[k].l, Math.abs(a[k].c-a[k-1].c)); s+=rg/a[k].c; c++; } return Math.max(s/c,1e-5); }
+function vwap(id,i,n=48){ const a=D[id]; let pv=0,v=0; for(let k=Math.max(0,i-n+1);k<=i;k++){ const w=a[k].v==null?1:a[k].v; pv+=(a[k].h+a[k].l+a[k].c)/3*w; v+=w; } return pv/v; }
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+
+/* ================= the council ================= */
+function pitchFor(who,id,i){
+  const px=D[id][i].c, f=sma(id,i,10), sl=sma(id,i,30), vol=rstd(id,i,30), ap=atrp(id,i);
+  let conf=0, why='', sm=1.6, tm=2.4;
+  if(who==='aadi' && f>sl && px>f){
+    const z=((f-sl)/sl)/vol; conf=clamp(28+20*z,0,95);
+    why=`Fast average is ${(((f-sl)/sl)*100).toFixed(2)}% above the slow one, price is above both. Riding the trend.`;
+  } else if(who==='beena'){
+    const r=rsi(id,i); if(r<36){ conf=clamp(30+(36-r)*2.4,0,95); why=`RSI is ${r.toFixed(0)}. Sold off hard, I expect a bounce.`; sm=1.4; tm=2.0; }
+  }
+  if(conf<=0) return null;
+  return {who,id,i,conf:Math.round(conf),why,entry:px,stop:px*(1-sm*ap),target:px*(1+tm*ap)};
+}
+function weigh(p){
+  const {id,i}=p, a=D[id], px=a[i].c, sl=sma(id,i,30), sl2=sma(id,i-8,30)||sl, vol=rstd(id,i,10), vol2=rstd(id,i,60), ap=atrp(id,i);
+  const checks=[
+    {ok:px>sl || (p.who==='beena' && sl>=sl2*(1-ap)), text:p.who==='aadi'?'Price is above the slow average':'The bigger trend is not collapsing'},
+    {ok:vol<1.8*vol2, text:'Volatility is normal for this market'},
+    {ok:Math.abs(px-sl)<3*ap*px, text:'Not chasing an over-stretched price'}
+  ];
+  if(a[i].v!=null){ const v3=(a[i].v+a[i-1].v+a[i-2].v)/3; let s=0; for(let k=i-29;k<=i;k++) s+=a[k].v; checks.push({ok:v3>=0.8*s/30, text:'There is volume behind the move'}); }
+  const ok=checks.filter(c=>c.ok).length;
+  const score=Math.round(0.5*p.conf+0.5*(ok/checks.length*100));
+  const label=score>=60?'take':score>=48?'fence':'pass';
+  return {checks,score,label};
+}
+function mani(p,w){
+  const thr=60-(S.trust[p.who]-50)*0.2;
+  return w.score>=thr && w.label!=='pass' ? 'take' : 'pass';
+}
+
+function say(who,text,kind){ S.feed.unshift({i:cur,who,text,kind}); if(S.feed.length>80) S.feed.pop(); S.say[who]={text,i:cur}; }
+function voice(who,k,x){
+  const L={
+    aadi:{pitch:`${x.sym} looks strong at £${x.px}. I want in.`, win:`That ${x.sym} call made £${x.pl}. I will keep my bar at ${x.bar}.`, loss:`${x.sym} cost me £${x.pl}. Raising my bar to ${x.bar} before I pitch again.`},
+    beena:{pitch:`${x.sym} is oversold at £${x.px}. Worth a measured bet.`, win:`The ${x.sym} bounce paid £${x.pl}. I can relax my bar to ${x.bar}.`, loss:`${x.sym} kept falling and cost £${x.pl}. My bar goes up to ${x.bar}.`},
+    chandu:{win:`I approved ${x.sym} and it paid. I trust my checks a little more.`, loss:`I approved ${x.sym} and it lost. My checklist missed something.`},
+    mani:{take:`Taking ${x.sym}: ${x.by}'s idea, Chandu scored it ${x.score}.`, pass:`Passing on ${x.sym}. Not convincing enough.`, win:`${x.sym} closed green. Good ruling.`, loss:`${x.sym} closed red. I will be tougher next time.`}
+  };
+  return L[who][k];
+}
+const f2=n=>n>=100?n.toFixed(2):n>=1?n.toFixed(3):n.toFixed(4);
+const fm=(n,d=2)=>n.toLocaleString('en-GB',{minimumFractionDigits:d,maximumFractionDigits:d});
+const gbp=n=>(n<0?'-':'')+'£'+fm(Math.abs(n));
+const nm=id=>MK[market].list.find(x=>x[0]===id)[1];
+
+function closePos(id,price,why,i){
+  const p=S.pos[id]; if(!p) return;
+  const val=p.units*price, pl=val-p.cost, win=pl>0, R=p.risk>0?pl/p.risk:0;
+  S.cash+=val; delete S.pos[id]; S.cool[id]=i;
+  S.closed.unshift({id,by:p.by,entry:p.entry,exit:price,pl,R,why,i0:p.i,i1:i});
+  (S.marks[id]=S.marks[id]||[]).push({i,price,side:'sell'});
+  const by=p.by, d=win?-1:2; S.minConf[by]=clamp(S.minConf[by]+(win?-1:2),25,70);
+  const mv=(k,amt)=>{ S.trust[k]=clamp(S.trust[k]+amt,5,95); S.hist[k].push(S.trust[k]); };
+  mv(by,win?3:-3); mv('mani',win?2:-2); if(p.chandu==='take'||p.chandu==='fence') mv('chandu',win?2:-2);
+  S.stats[by].p++; if(win) S.stats[by].w++; S.stats.mani.p++; if(win) S.stats.mani.w++; S.stats.chandu.p++; if(win) S.stats.chandu.w++;
+  const x={sym:nm(id),pl:Math.abs(pl).toFixed(2),bar:S.minConf[by]};
+  say(by,voice(by,win?'win':'loss',x)+` (${why})`,win?'win':'loss');
+  say('chandu',voice('chandu',win?'win':'loss',x),win?'win':'loss');
+  say('mani',voice('mani',win?'win':'loss',x),win?'win':'loss');
+}
+
+function step(){
+  if(cur>=N-1) return false;
+  cur++; const i=cur, mk=MK[market];
+  // exits
+  for(const id of Object.keys(S.pos)){
+    const p=S.pos[id], b=D[id][i];
+    if(b.l<=p.stop) closePos(id,Math.min(p.stop,b.o),'stop hit',i);
+    else if(b.h>=p.target) closePos(id,Math.max(p.target,b.o),'target hit',i);
+    else if(p.by==='aadi' && sma(id,i,10)<sma(id,i,30) && b.c<sma(id,i,30)) closePos(id,b.c,'trend broke',i);
+    else if(p.by==='beena' && rsi(id,i)>62) closePos(id,b.c,'bounce done',i);
+    else if(i-p.i>=mk.maxHold) closePos(id,b.c,'held too long',i);
+  }
+  // pitches
+  S.pitches=S.pitches.filter(p=>i-p.i<=(market==='cr'?24:4));
+  if(Object.keys(S.pos).length<mk.maxPos && S.cash>10){
+    const cands=[];
+    for(const who of ['aadi','beena']){
+      let best=null;
+      for(const [id] of mk.list){
+        if(S.pos[id]||(S.cool[id]!=null&&i-S.cool[id]<mk.cool)) continue;
+        const p=pitchFor(who,id,i); if(p&&p.conf>=S.minConf[who]&&(!best||p.conf>best.conf)) best=p;
+      }
+      if(best) cands.push(best);
+    }
+    let take=null;
+    for(const p of cands){
+      const w=weigh(p); p.w=w; p.rule=mani(p,w);
+      S.stats[p.who]; say(p.who,voice(p.who,'pitch',{sym:nm(p.id),px:f2(p.entry)}),'pitch');
+      say('chandu',`${nm(p.id)}: ${w.checks.filter(c=>c.ok).length} of ${w.checks.length} checks pass. Score ${w.score}, ${w.label==='take'?'take it':w.label==='fence'?'on the fence':'do not take'}.`,'weigh');
+      S.pitches.unshift(p);
+      if(p.rule==='take' && (!take||w.score>take.w.score)) take=p;
+    }
+    S.pitches=S.pitches.slice(0,5);
+    if(take && !S.pos[take.id]){
+      const eq=S.cash+Object.entries(S.pos).reduce((t,[k,q])=>t+q.units*D[k][i].c,0);
+      const amt=Math.min(S.cash,Math.max(10,eq*0.3)), units=amt/take.entry;
+      S.pos[take.id]={units,cost:amt,entry:take.entry,stop:take.stop,target:take.target,by:take.who,i,chandu:take.w.label,risk:units*(take.entry-take.stop)};
+      S.cash-=amt; (S.marks[take.id]=S.marks[take.id]||[]).push({i,price:take.entry,side:'buy'});
+      take.taken=true;
+      say('mani',voice('mani','take',{sym:nm(take.id),by:AG[take.who].name,score:take.w.score}),'take');
+    }
+    cands.forEach(p=>{ if(!p.taken) say('mani',voice('mani','pass',{sym:nm(p.id)}),'pass'); });
+  }
+  // equity
+  let eq=S.cash; for(const id in S.pos) eq+=S.pos[id].units*D[id][i].c;
+  S.eq.push(eq);
+  S.bench.push(S.start*mk.list.reduce((t,[id])=>t+D[id][i].c/S.px0[id],0)/mk.list.length);
+  return true;
+}
+
+function restart(){
+  const mk=MK[market];
+  const cash=Math.max(50,+$('cash').value||1000);
+  fromBars=+$('from').value||mk.from[0][1];
+  const start=clamp(N-1-fromBars,mk.warm+2,N-2);
+  S=fresh(cash,start); cur=start; mode='replay'; paused=false; acc=0; $('pause').textContent='Pause';
+  mk.list.forEach(([id])=>S.px0[id]=D[id][start].c);
+  S.eq.push(cash); S.bench.push(cash);
+  S.feed.unshift({i:cur,who:'mani',text:`Council is open with ${gbp(cash)} of virtual money. Replaying real ${mk.barName} from ${new Date(D[sel][start].t).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}.`,kind:'pitch'});
+  dirty=true; render();
+}
+
+/* ================= rendering ================= */
+const pill=(t,cls)=>{ $('mode').className='pill '+(cls||''); $('modeTxt').textContent=t; };
+function when(i){ const t=D[sel]&&D[sel][i]?D[sel][i].t:0; return new Date(t).toLocaleString('en-GB',market==='cr'?{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}:{weekday:'short',day:'numeric',month:'short',year:'numeric'}); }
+function avatar(k){ const a=AG[k]; return `<svg viewBox="0 0 68 68" aria-hidden="true"><defs><radialGradient id="g${k}" cx="35%" cy="30%"><stop offset="0" stop-color="${a.g[0]}"/><stop offset="1" stop-color="${a.g[1]}"/></radialGradient></defs><circle cx="34" cy="34" r="30" fill="#0a1017" stroke="${a.col}" stroke-width="2.5"/><circle cx="34" cy="34" r="25" fill="url(#g${k})"/><text x="34" y="43" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-weight="700" font-size="26" fill="#0a1017">${a.tag}</text></svg>`; }
+
+let stageBuilt=false;
+function render(){
+  const mk=MK[market];
+  if(mode==='error'){ pill('data source unreachable','err'); }
+  else if(mode==='loading'){ pill('loading real prices'); }
+  else if(mode==='replay'){ pill('Replay / '+when(cur)); }
+  else if(mode==='live'){ pill('Live / '+when(cur),'live'); }
+  else { pill('Caught up / '+when(cur),'live'); }
+  document.querySelectorAll('[data-sp]').forEach(b=>b.setAttribute('aria-pressed',+b.dataset.sp===speed));
+  $('m-cr').setAttribute('aria-pressed',market==='cr'); $('m-fx').setAttribute('aria-pressed',market==='fx');
+  if(!S||!D[sel]){ return; }
+
+  // ticker
+  $('strip').innerHTML=mk.list.map(([id,n])=>{ const p=D[id][cur].c, p0=D[id][S.startIdx].c, ch=(p/p0-1)*100;
+    return `<button class="tk" data-id="${id}" aria-pressed="${sel===id}"><span class="n">${n}</span><span class="p">£${f2(p)}</span><span class="c ${ch>=0?'up':'down'}">${ch>=0?'+':''}${ch.toFixed(2)}% since start</span></button>`; }).join('');
+  document.querySelectorAll('.tk').forEach(b=>b.onclick=()=>{ sel=b.dataset.id; dirty=true; render(); });
+
+  // portfolio
+  const eq=S.eq[S.eq.length-1], pl=eq-S.start, bn=S.bench[S.bench.length-1];
+  $('eq').innerHTML=`<span class="${pl>=0?'up':'down'}">${gbp(eq)}</span>`;
+  $('pfs').innerHTML=`<span>${pl>=0?'+':''}${gbp(pl)} (${pl>=0?'+':''}${(pl/S.start*100).toFixed(2)}%) since the start</span><span>Started with ${gbp(S.start)}</span><span>Holding everything equally would be ${gbp(bn)}</span><span>Cash ${gbp(S.cash)}</span>`;
+  $('pfnote').textContent=`${cur-S.startIdx} ${mk.unit}s played · ${mk.barName}`;
+  const dd=S.eq[Math.max(0,S.eq.length-1-mk.dayBars)], today=eq-dd;
+  $('s-today').innerHTML=`<span class="${today>=0?'up':'down'}">${today>=0?'+':''}${gbp(today)}</span>`; $('s-today2').textContent=`${today>=0?'+':''}${(today/dd*100).toFixed(2)}% on the ${mk.unit==='bar'?'last 24 hours':'last day'}`;
+  const W=S.closed.filter(t=>t.pl>0), Ls=S.closed.filter(t=>t.pl<=0);
+  $('s-win').textContent=S.closed.length?Math.round(W.length/S.closed.length*100)+'%':'—'; $('s-win2').textContent=`${W.length} won, ${Ls.length} lost`;
+  $('s-r').innerHTML=S.closed.length?`<span class="${S.closed.reduce((t,x)=>t+x.R,0)>=0?'up':'down'}">${(S.closed.reduce((t,x)=>t+x.R,0)/S.closed.length).toFixed(2)}R</span>`:'—';
+  const gw=W.reduce((t,x)=>t+x.pl,0), gl=-Ls.reduce((t,x)=>t+x.pl,0);
+  $('s-pf').textContent=S.closed.length?(gl>0?(gw/gl).toFixed(2):gw>0?'∞':'—'):'—';
+  drawEq();
+
+  // council stage
+  $('stage').innerHTML=KEYS.map(k=>{ const a=AG[k], s=S.say[k], talk=s&&cur-s.i<=(market==='cr'?3:1);
+    return `<div class="ag ${talk?'talk':''}"><div class="av"><div class="halo" style="box-shadow:0 0 22px 2px ${a.col}88"></div>${avatar(k)}</div><div class="nm" style="color:${a.col}">${a.name}</div><div class="rl">${a.role}</div><div class="say">${s?s.text:'Watching the market…'}</div></div>`; }).join('');
+  $('pitches').innerHTML=S.pitches.length?S.pitches.map(p=>{ const a=AG[p.who], w=p.w; return `<div class="pc">
+    <div><div class="who" style="color:${a.col}">${a.name} pitches</div><div class="sym">${nm(p.id)}</div><div class="plan">Buy £${f2(p.entry)} · stop £${f2(p.stop)} · target £${f2(p.target)}</div><div class="plan">${p.why}</div><div class="bar"><i style="width:${p.conf}%;background:${a.col}"></i></div><div class="plan">Confidence ${p.conf}</div></div>
+    <div><div class="who" style="color:${AG.chandu.col}">Chandu weighs it · ${when(p.i)}</div><ul class="chk">${w.checks.map(c=>`<li class="${c.ok?'ok':''}">${c.text}</li>`).join('')}</ul></div>
+    <div><div class="vd ${w.label}">${w.label==='take'?'TAKE IT':w.label==='fence'?'ON THE FENCE':"DON'T TAKE"} ${w.score}</div><div class="rule" style="color:${p.rule==='take'?'var(--up)':'var(--mute)'}">Mani: ${p.rule==='take'?'taken':'passed'}</div></div></div>`; }).join('')
+    :'<div class="empty">No pitches right now. Agents only speak up when their confidence clears the bar they have learned to set.</div>';
+
+  // positions
+  const pk=Object.keys(S.pos);
+  $('pos').innerHTML=pk.length?`<table><thead><tr><th>Holding</th><th>By</th><th>Value</th><th>P/L</th><th>Stop</th><th>Target</th></tr></thead><tbody>${pk.map(id=>{ const q=S.pos[id], pr=D[id][cur].c, v=q.units*pr, p=v-q.cost;
+    return `<tr><td>${nm(id)}</td><td style="color:${AG[q.by].col}">${AG[q.by].name}</td><td>${gbp(v)}</td><td class="${p>=0?'up':'down'}">${p>=0?'+':''}${fm(p)}</td><td>${f2(q.stop)}</td><td>${f2(q.target)}</td></tr>`; }).join('')}</tbody></table>`
+    :'<div class="empty">Nothing held. The council is in cash and waiting for a pitch it believes in.</div>';
+
+  // trust
+  const spark=(h,col)=>{ const w=80,hh=22; const mn=Math.min(...h,45), mx=Math.max(...h,55); const pts=h.slice(-14).map((v,i,a)=>`${(a.length>1?i/(a.length-1):0)*w},${hh-(v-mn)/(mx-mn)*hh}`).join(' '); return `<svg width="${w}" height="${hh}" viewBox="0 0 ${w} ${hh}" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.6"/></svg>`; };
+  $('trust').innerHTML=`<table><thead><tr><th>Agent</th><th>Trust</th><th></th><th>Trend</th><th>Finished</th><th>Won</th></tr></thead><tbody>${KEYS.map(k=>{ const a=AG[k], t=Math.round(S.trust[k]), st=S.stats[k];
+    return `<tr><td><b style="color:${a.col}">${a.name}</b><div style="color:var(--mute);font-size:10px">${a.role}</div></td><td><b>${t}</b></td><td><span class="meter">${Array.from({length:10},(_,n)=>`<i style="${n<Math.round(t/10)?`background:${a.col}`:''}"></i>`).join('')}</span></td><td class="sp">${spark(S.hist[k],a.col)}</td><td>${st.p}</td><td>${st.p?Math.round(st.w/st.p*100)+'%':'—'}</td></tr>`; }).join('')}</tbody></table>`;
+  $('closed').innerHTML=S.closed.length?`<table><thead><tr><th>Market</th><th>By</th><th>Why out</th><th>P/L</th><th>R</th></tr></thead><tbody>${S.closed.slice(0,8).map(t=>`<tr><td>${nm(t.id)}</td><td style="color:${AG[t.by].col}">${AG[t.by].name}</td><td>${t.why}</td><td class="${t.pl>=0?'up':'down'}">${t.pl>=0?'+':''}${fm(t.pl)}</td><td class="${t.R>=0?'up':'down'}">${t.R.toFixed(2)}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">No finished trades yet.</div>';
+
+  // feed
+  $('feed').innerHTML=S.feed.slice(0,30).map(f=>`<div class="fi"><span class="w" style="color:${AG[f.who].col}">${AG[f.who].name}</span><span class="t">${when(f.i)}</span><span></span><span style="${f.kind==='loss'?'color:var(--down)':f.kind==='win'?'color:var(--up)':''}">${f.text}</span></div>`).join('');
+
+  drawPrice();
+}
+
+function setup(cv){ const dpr=window.devicePixelRatio||1, W=cv.clientWidth, H=cv.clientHeight; cv.width=W*dpr; cv.height=H*dpr; const c=cv.getContext('2d'); c.setTransform(dpr,0,0,dpr,0,0); c.clearRect(0,0,W,H); return {c,W,H}; }
+function drawEq(){
+  const {c,W,H}=setup($('eqc')); const a=S.eq, b=S.bench; if(a.length<2){ return; }
+  const all=a.concat(b); let lo=Math.min(...all), hi=Math.max(...all); const pd=(hi-lo)*0.1||1; lo-=pd; hi+=pd;
+  const X=i=>i/(a.length-1)*(W-56), Y=v=>(1-(v-lo)/(hi-lo))*(H-6)+3;
+  c.strokeStyle='#18232e'; c.fillStyle='#6f8091'; c.font='10px IBM Plex Mono,monospace';
+  for(let k=0;k<=2;k++){ const v=lo+(hi-lo)*k/2, y=Y(v); c.beginPath(); c.moveTo(0,y); c.lineTo(W-56,y); c.stroke(); c.fillText('£'+fm(v,0),W-52,y+3); }
+  const L=(arr,col,w)=>{ c.beginPath(); arr.forEach((v,i)=>i?c.lineTo(X(i),Y(v)):c.moveTo(X(i),Y(v))); c.strokeStyle=col; c.lineWidth=w; c.stroke(); };
+  L(b,'#6f8091',1.2); const up=a[a.length-1]>=S.start; L(a,up?'#39e58c':'#ff5d5d',2);
+  $('eqleg').textContent='Council'; c.fillStyle=up?'#39e58c':'#ff5d5d'; c.beginPath(); c.arc(X(a.length-1),Y(a[a.length-1]),3.5,0,7); c.fill();
+}
+function drawPrice(){
+  const {c,W,H}=setup($('pc')); const a=D[sel], n=market==='cr'?90:70, i1=cur, i0=Math.max(0,i1-n+1), m=i1-i0+1;
+  $('ctitle').textContent=`· ${nm(sel)} · ${MK[market].barName}`;
+  const hasVol=a[0].v!=null; $('vwl').textContent=hasVol?'VWAP (48 bars)':'Average (48 days)';
+  let lo=1e18,hi=-1e18; for(let k=i0;k<=i1;k++){ lo=Math.min(lo,a[k].l); hi=Math.max(hi,a[k].h); }
+  const q=S.pos[sel]; if(q){ lo=Math.min(lo,q.stop); hi=Math.max(hi,q.target); }
+  const pd=(hi-lo)*0.06||hi*0.001; lo-=pd; hi+=pd;
+  const R=62,B=18, pw=W-R, ph=H-B, X=k=>(k-i0+0.5)/m*pw, Y=v=>(1-(v-lo)/(hi-lo))*(ph-4)+2, bw=Math.max(1.5,pw/m*0.62);
+  c.strokeStyle='#18232e'; c.fillStyle='#6f8091'; c.font='10px IBM Plex Mono,monospace'; c.lineWidth=1;
+  for(let k=0;k<=4;k++){ const v=lo+(hi-lo)*k/4, y=Y(v); c.beginPath(); c.moveTo(0,y); c.lineTo(pw,y); c.stroke(); c.fillText(f2(v),pw+6,y+3); }
+  c.fillText(when(i0).replace(/^\w+,? /,''),0,H-4); const e=when(i1).replace(/^\w+,? /,''); c.fillText(e,pw-c.measureText(e).width,H-4);
+  const flat=!hasVol;
+  if(flat){ c.beginPath(); for(let k=i0;k<=i1;k++){ k===i0?c.moveTo(X(k),Y(a[k].c)):c.lineTo(X(k),Y(a[k].c)); } c.strokeStyle='#d4dde6'; c.lineWidth=1.8; c.stroke(); }
+  else for(let k=i0;k<=i1;k++){ const b=a[k], col=b.c>=b.o?'#39e58c':'#ff5d5d'; c.strokeStyle=col; c.fillStyle=col; c.lineWidth=1; const x=X(k); c.beginPath(); c.moveTo(x,Y(b.h)); c.lineTo(x,Y(b.l)); c.stroke(); const y1=Y(Math.max(b.o,b.c)), y2=Y(Math.min(b.o,b.c)); c.fillRect(x-bw/2,y1,bw,Math.max(1,y2-y1)); }
+  c.beginPath(); for(let k=i0;k<=i1;k++){ const v=vwap(sel,k); k===i0?c.moveTo(X(k),Y(v)):c.lineTo(X(k),Y(v)); } c.strokeStyle='#f5a524'; c.lineWidth=1.5; c.stroke();
+  if(q){ c.setLineDash([4,4]); c.lineWidth=1; [['#ff5d5d',q.stop],['#39e58c',q.target],['#6f8091',q.entry]].forEach(([col,v])=>{ c.strokeStyle=col; c.beginPath(); c.moveTo(0,Y(v)); c.lineTo(pw,Y(v)); c.stroke(); }); c.setLineDash([]); $('stpLeg').textContent='dashed: target, entry, stop'; } else $('stpLeg').textContent='';
+  (S.marks[sel]||[]).forEach(mk=>{ if(mk.i<i0||mk.i>i1) return; const x=X(mk.i), y=Y(mk.price), up=mk.side==='buy'; c.fillStyle=up?'#39e58c':'#ff5d5d'; c.beginPath(); if(up){ c.moveTo(x,y+4); c.lineTo(x-6,y+14); c.lineTo(x+6,y+14);} else { c.moveTo(x,y-4); c.lineTo(x-6,y-14); c.lineTo(x+6,y-14);} c.closePath(); c.fill(); });
+}
+
+/* ================= loop ================= */
+function frame(ts){
+  const dt=Math.min(0.25,(ts-(lastT||ts))/1000); lastT=ts;
+  if(S && (mode==='replay') && !paused){
+    acc+=dt*speed; let n=Math.floor(acc); acc-=n; let moved=false;
+    while(n-->0){ if(!step()){ mode=market==='cr'?'live':'caught'; break; } moved=true; }
+    if(moved) dirty=true;
+  } else if(S && mode==='live' && !paused && cur<N-1){
+    // new live bars arrived from polling
+    acc+=dt*Math.max(speed,6); let n=Math.floor(acc); acc-=n; while(n-->0 && step()) dirty=true;
+  }
+  if(dirty){ dirty=false; render(); }
+  requestAnimationFrame(frame);
+}
+
+/* ================= events ================= */
+function fillFrom(){ $('from').innerHTML=MK[market].from.map(([t,v])=>`<option value="${v}">${t}</option>`).join(''); }
+function setMarket(m){ market=m; sel=null; fillFrom(); clearInterval(liveTimer); loadMarket(); liveTimer=setInterval(pollLive,15000); }
+$('m-cr').onclick=()=>market!=='cr'&&setMarket('cr'); $('m-fx').onclick=()=>market!=='fx'&&setMarket('fx');
+$('pause').onclick=()=>{ paused=!paused; $('pause').textContent=paused?'Resume':'Pause'; };
+document.querySelectorAll('[data-sp]').forEach(b=>b.onclick=()=>{ speed=+b.dataset.sp; dirty=true; });
+$('restart').onclick=()=>{ if(N) restart(); };
+window.addEventListener('resize',()=>{ dirty=true; });
+fillFrom(); setMarket('cr'); requestAnimationFrame(frame);
+</script>
+</body>
+</html>
