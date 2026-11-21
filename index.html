@@ -138,14 +138,14 @@ footer{margin-top:28px;padding-top:14px;border-top:1px solid var(--line);color:v
 <div class="top">
   <div class="brand">
     <div class="logo"><i></i></div>
-    <div><h1>Paper Desk</h1><div class="lab">Four agents. Virtual money.</div></div>
+    <div><h1>Paper Desk</h1><div class="lab">Micro account. £1 risked per trade.</div></div>
     <span class="pill" id="mode"><b></b><span id="modeTxt">loading</span></span>
   </div>
   <div class="ctrls">
     <div class="seg" role="group" aria-label="Market"><button id="m-cr" aria-pressed="true">Crypto</button><button id="m-fx" aria-pressed="false">Forex</button></div>
     <button class="btn" id="pause">Pause</button>
     <div class="seg" role="group" aria-label="Speed"><button data-sp="1" aria-pressed="false">1x</button><button data-sp="6" aria-pressed="true">6x</button><button data-sp="30" aria-pressed="false">30x</button><button data-sp="400" aria-pressed="false">Max</button></div>
-    <label class="fld">Virtual cash (£)<input id="cash" type="number" min="50" step="50" value="1000"></label>
+    <label class="fld">Virtual cash (£)<input id="cash" type="number" min="20" step="10" value="100"></label>
     <label class="fld">Start from<select id="from"></select></label>
     <button class="btn go" id="restart">Restart</button>
   </div>
@@ -208,7 +208,7 @@ footer{margin-top:28px;padding-top:14px;border-top:1px solid var(--line);color:v
 </div>
 
 <footer>
-  This is a simulation for learning. It trades virtual money on real past prices, then keeps going on live prices once the replay catches up.
+  This is a micro-account simulation for learning: small virtual cash, 1% risked per trade, and a 0.05% fee each way so costs bite like they do in real life. It trades virtual money on real past prices, then keeps going on live prices once the replay catches up.
   Crypto prices: Binance public data, 5-minute bars. Forex: ECB daily reference rates via Frankfurter, quoted as the value of the currency in pounds.
   Nothing here is financial advice. Past patterns do not predict future prices.
 </footer>
@@ -218,6 +218,7 @@ footer{margin-top:28px;padding-top:14px;border-top:1px solid var(--line);color:v
 'use strict';
 /* ================= config ================= */
 const $ = id => document.getElementById(id);
+const FEE=0.0005, RISK=0.01;   // 0.05% spread/fee each way, 1% of the account risked per trade
 const MK = {
   cr:{ name:'Crypto', warm:40, dayBars:288, maxPos:3, maxHold:72, cool:12,
        list:[['BTCGBP','BTC / GBP'],['ETHGBP','ETH / GBP'],['SOLGBP','SOL / GBP'],['XRPGBP','XRP / GBP']],
@@ -243,7 +244,7 @@ function fresh(cash,startIdx){
   return { cash, start:cash, startIdx, pos:{}, closed:[], marks:{}, cool:{},
     trust:{aadi:50,beena:50,chandu:50,mani:50}, hist:{aadi:[50],beena:[50],chandu:[50],mani:[50]},
     minConf:{aadi:35,beena:35}, stats:{aadi:{p:0,w:0},beena:{p:0,w:0},chandu:{p:0,w:0},mani:{p:0,w:0}},
-    feed:[], pitches:[], say:{}, eq:[], bench:[], px0:{} };
+    feed:[], pitches:[], say:{}, eq:[], bench:[], px0:{}, fees:0 };
 }
 
 /* ================= data ================= */
@@ -345,8 +346,8 @@ const nm=id=>MK[market].list.find(x=>x[0]===id)[1];
 
 function closePos(id,price,why,i){
   const p=S.pos[id]; if(!p) return;
-  const val=p.units*price, pl=val-p.cost, win=pl>0, R=p.risk>0?pl/p.risk:0;
-  S.cash+=val; delete S.pos[id]; S.cool[id]=i;
+  const gross=p.units*price, fee=gross*FEE, val=gross-fee, pl=val-p.cost, win=pl>0, R=p.risk>0?pl/p.risk:0;
+  S.cash+=val; S.fees+=fee; delete S.pos[id]; S.cool[id]=i;
   S.closed.unshift({id,by:p.by,entry:p.entry,exit:price,pl,R,why,i0:p.i,i1:i});
   (S.marks[id]=S.marks[id]||[]).push({i,price,side:'sell'});
   const by=p.by, d=win?-1:2; S.minConf[by]=clamp(S.minConf[by]+(win?-1:2),25,70);
@@ -373,7 +374,7 @@ function step(){
   }
   // pitches
   S.pitches=S.pitches.filter(p=>i-p.i<=(market==='cr'?24:4));
-  if(Object.keys(S.pos).length<mk.maxPos && S.cash>10){
+  if(Object.keys(S.pos).length<mk.maxPos && S.cash>5){
     const cands=[];
     for(const who of ['aadi','beena']){
       let best=null;
@@ -394,11 +395,14 @@ function step(){
     S.pitches=S.pitches.slice(0,5);
     if(take && !S.pos[take.id]){
       const eq=S.cash+Object.entries(S.pos).reduce((t,[k,q])=>t+q.units*D[k][i].c,0);
-      const amt=Math.min(S.cash,Math.max(10,eq*0.3)), units=amt/take.entry;
+      const riskPct=(take.entry-take.stop)/take.entry, amt=Math.min(S.cash,eq*0.4,eq*RISK/riskPct), units=amt*(1-FEE)/take.entry;
+      if(amt<5){ say('mani','Skipping '+nm(take.id)+': too small to be worth the fee.','pass'); } else {
+      S.fees+=amt*FEE;
       S.pos[take.id]={units,cost:amt,entry:take.entry,stop:take.stop,target:take.target,by:take.who,i,chandu:take.w.label,risk:units*(take.entry-take.stop)};
       S.cash-=amt; (S.marks[take.id]=S.marks[take.id]||[]).push({i,price:take.entry,side:'buy'});
       take.taken=true;
       say('mani',voice('mani','take',{sym:nm(take.id),by:AG[take.who].name,score:take.w.score}),'take');
+      }
     }
     cands.forEach(p=>{ if(!p.taken) say('mani',voice('mani','pass',{sym:nm(p.id)}),'pass'); });
   }
@@ -411,7 +415,7 @@ function step(){
 
 function restart(){
   const mk=MK[market];
-  const cash=Math.max(50,+$('cash').value||1000);
+  const cash=Math.max(20,+$('cash').value||100);
   fromBars=+$('from').value||mk.from[0][1];
   const start=clamp(N-1-fromBars,mk.warm+2,N-2);
   S=fresh(cash,start); cur=start; mode='replay'; paused=false; acc=0; $('pause').textContent='Pause';
@@ -446,7 +450,7 @@ function render(){
   // portfolio
   const eq=S.eq[S.eq.length-1], pl=eq-S.start, bn=S.bench[S.bench.length-1];
   $('eq').innerHTML=`<span class="${pl>=0?'up':'down'}">${gbp(eq)}</span>`;
-  $('pfs').innerHTML=`<span>${pl>=0?'+':''}${gbp(pl)} (${pl>=0?'+':''}${(pl/S.start*100).toFixed(2)}%) since the start</span><span>Started with ${gbp(S.start)}</span><span>Holding everything equally would be ${gbp(bn)}</span><span>Cash ${gbp(S.cash)}</span>`;
+  $('pfs').innerHTML=`<span>${pl>=0?'+':''}${gbp(pl)} (${pl>=0?'+':''}${(pl/S.start*100).toFixed(2)}%) since the start</span><span>Started with ${gbp(S.start)}</span><span>Holding everything equally would be ${gbp(bn)}</span><span>Cash ${gbp(S.cash)}</span><span>Risk per trade ${gbp(eq*RISK)} (1%)</span><span>Fees paid ${gbp(S.fees)}</span>`;
   $('pfnote').textContent=`${cur-S.startIdx} ${mk.unit}s played · ${mk.barName}`;
   const dd=S.eq[Math.max(0,S.eq.length-1-mk.dayBars)], today=eq-dd;
   $('s-today').innerHTML=`<span class="${today>=0?'up':'down'}">${today>=0?'+':''}${gbp(today)}</span>`; $('s-today2').textContent=`${today>=0?'+':''}${(today/dd*100).toFixed(2)}% on the ${mk.unit==='bar'?'last 24 hours':'last day'}`;
@@ -468,8 +472,8 @@ function render(){
 
   // positions
   const pk=Object.keys(S.pos);
-  $('pos').innerHTML=pk.length?`<table><thead><tr><th>Holding</th><th>By</th><th>Value</th><th>P/L</th><th>Stop</th><th>Target</th></tr></thead><tbody>${pk.map(id=>{ const q=S.pos[id], pr=D[id][cur].c, v=q.units*pr, p=v-q.cost;
-    return `<tr><td>${nm(id)}</td><td style="color:${AG[q.by].col}">${AG[q.by].name}</td><td>${gbp(v)}</td><td class="${p>=0?'up':'down'}">${p>=0?'+':''}${fm(p)}</td><td>${f2(q.stop)}</td><td>${f2(q.target)}</td></tr>`; }).join('')}</tbody></table>`
+  $('pos').innerHTML=pk.length?`<table><thead><tr><th>Holding</th><th>By</th><th>Size</th><th>Risk</th><th>Value</th><th>P/L</th><th>Stop</th><th>Target</th></tr></thead><tbody>${pk.map(id=>{ const q=S.pos[id], pr=D[id][cur].c, v=q.units*pr, p=v-q.cost;
+    return `<tr><td>${nm(id)}</td><td style="color:${AG[q.by].col}">${AG[q.by].name}</td><td>${q.units>=1000?fm(q.units,0):q.units.toFixed(q.units<1?5:2)}</td><td>${gbp(q.risk)}</td><td>${gbp(v)}</td><td class="${p>=0?'up':'down'}">${p>=0?'+':''}${fm(p)}</td><td>${f2(q.stop)}</td><td>${f2(q.target)}</td></tr>`; }).join('')}</tbody></table>`
     :'<div class="empty">Nothing held. The council is in cash and waiting for a pitch it believes in.</div>';
 
   // trust
